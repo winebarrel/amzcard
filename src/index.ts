@@ -33,6 +33,7 @@ type Product = {
   amazonUrl: string;
   title: string;
   image: string | null;
+  isBook: boolean;
   description: string;
 };
 
@@ -40,6 +41,7 @@ async function fetchAmazonProduct(asin: string): Promise<Product> {
   const amazonUrl = `https://${AMAZON_HOST}/dp/${asin}`;
   let title = `Amazon: ${asin}`;
   let image: string | null = null;
+  let isBook = false;
   let description = "";
   try {
     const res = await fetch(amazonUrl, {
@@ -53,12 +55,17 @@ async function fetchAmazonProduct(asin: string): Promise<Product> {
       const parsed = await parseAmazonHtml(res);
       if (parsed.title) title = parsed.title;
       if (parsed.image) image = parsed.image;
-      if (parsed.description) description = parsed.description;
+      if (parsed.authors && parsed.authors.length > 0) {
+        isBook = true;
+        description = `${parsed.authors.join(", ")} (著)`;
+      } else if (parsed.description) {
+        description = parsed.description;
+      }
     }
   } catch {
     // fall through with defaults
   }
-  return { asin, amazonUrl, title, image, description };
+  return { asin, amazonUrl, title, image, isBook, description };
 }
 
 async function ogpPage(asin: string): Promise<Response> {
@@ -96,37 +103,28 @@ async function previewApi(asin: string): Promise<Response> {
   return response;
 }
 
-type Parsed = { title?: string; image?: string; description?: string };
+type Parsed = {
+  title?: string;
+  image?: string;
+  description?: string;
+  authors?: string[];
+};
 
 async function parseAmazonHtml(res: Response): Promise<Parsed> {
   const titleTag = new TextCollector();
   const productTitle = new TextCollector();
+  const authors = new AuthorCollector();
   const meta: { description?: string } = {};
-  const images: Array<{ url: string; w: number }> = [];
   let landingImage: string | undefined;
 
   const rewriter = new HTMLRewriter()
     .on("title", titleTag)
     .on("#productTitle", productTitle)
+    .on("#bylineInfo .author a", authors)
     .on('meta[name="description"]', {
       element(el) {
         const c = el.getAttribute("content");
         if (c) meta.description = c;
-      },
-    })
-    .on("[data-a-dynamic-image]", {
-      element(el) {
-        const raw = el.getAttribute("data-a-dynamic-image");
-        if (!raw) return;
-        try {
-          const map = JSON.parse(raw) as Record<string, [number, number]>;
-          for (const [u, dims] of Object.entries(map)) {
-            const w = Array.isArray(dims) ? Number(dims[0]) : 0;
-            images.push({ url: u, w });
-          }
-        } catch {
-          // ignore
-        }
       },
     })
     .on("#landingImage", {
@@ -147,23 +145,44 @@ async function parseAmazonHtml(res: Response): Promise<Parsed> {
     if (tt) out.title = tt;
   }
 
-  if (images.length) {
-    images.sort((a, b) => b.w - a.w);
-    out.image = images[0].url;
-  } else if (landingImage) {
-    out.image = landingImage;
+  if (landingImage) {
+    out.image = stripAmazonImageSize(landingImage);
   }
 
   if (meta.description) {
     out.description = meta.description.slice(0, 200);
   }
 
+  if (authors.list.length > 0) {
+    out.authors = authors.list;
+  }
+
   return out;
+}
+
+function stripAmazonImageSize(url: string): string {
+  return url.replace(/\._[A-Z0-9_+]+_\.(jpg|jpeg|png|gif|webp)$/i, ".$1");
 }
 
 class TextCollector {
   out = "";
   text(chunk: Text) {
     this.out += chunk.text;
+  }
+}
+
+class AuthorCollector {
+  private buf = "";
+  list: string[] = [];
+  element(el: Element) {
+    this.buf = "";
+    el.onEndTag(() => {
+      const name = this.buf.trim();
+      if (name) this.list.push(name);
+      this.buf = "";
+    });
+  }
+  text(chunk: Text) {
+    this.buf += chunk.text;
   }
 }
