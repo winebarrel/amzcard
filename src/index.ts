@@ -1,27 +1,25 @@
+import puppeteer, { type BrowserWorker } from "@cloudflare/puppeteer";
 import indexHtml from "./index.html";
 import { renderOgp } from "./render-ogp";
 
-const BROWSER_UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const AMAZON_HOST = "www.amazon.co.jp";
 
+interface Env {
+  BROWSER: BrowserWorker;
+}
+
 export default {
-  async fetch(req: Request): Promise<Response> {
+  async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
     const dp = url.pathname.match(/^\/dp\/([A-Z0-9]{10})\/?$/i);
     if (dp) {
-      return ogpPage(dp[1].toUpperCase());
+      return ogpPage(dp[1].toUpperCase(), env);
     }
 
     const api = url.pathname.match(/^\/api\/preview\/([A-Z0-9]{10})\/?$/i);
     if (api) {
-      return previewApi(api[1].toUpperCase());
-    }
-
-    const debug = url.pathname.match(/^\/debug\/([A-Z0-9]{10})\/?$/i);
-    if (debug) {
-      return debugProbe(debug[1].toUpperCase());
+      return previewApi(api[1].toUpperCase(), env);
     }
 
     if (url.pathname === "/" || url.pathname === "") {
@@ -32,7 +30,7 @@ export default {
 
     return new Response("Not Found", { status: 404 });
   },
-} satisfies ExportedHandler;
+} satisfies ExportedHandler<Env>;
 
 type Product = {
   asin: string;
@@ -43,96 +41,43 @@ type Product = {
   description: string;
 };
 
-async function debugProbe(asin: string): Promise<Response> {
-  const amazonUrl = `https://${AMAZON_HOST}/dp/${asin}`;
-  const headers = {
-    "User-Agent": BROWSER_UA,
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Upgrade-Insecure-Requests": "1",
-  };
-  const probe = async (redirect: "manual" | "follow") => {
-    const started = Date.now();
-    try {
-      const res = await fetch(amazonUrl, { headers, redirect });
-      const text = await res.text();
-      const respHeaders: Record<string, string> = {};
-      res.headers.forEach((v, k) => {
-        respHeaders[k] = v;
-      });
-      return {
-        mode: redirect,
-        ok: res.ok,
-        status: res.status,
-        finalUrl: res.url,
-        redirected: res.redirected,
-        contentLength: text.length,
-        headers: respHeaders,
-        bodySnippet: text.slice(0, 400),
-        elapsedMs: Date.now() - started,
-      };
-    } catch (e) {
-      return {
-        mode: redirect,
-        error: String(e),
-        elapsedMs: Date.now() - started,
-      };
-    }
-  };
-  const [manual, follow] = await Promise.all([probe("manual"), probe("follow")]);
-  return new Response(JSON.stringify({ asin, amazonUrl, manual, follow }, null, 2), {
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
-}
-
-async function fetchAmazonProduct(asin: string): Promise<Product> {
+async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
   const amazonUrl = `https://${AMAZON_HOST}/dp/${asin}`;
   let title = `Amazon: ${asin}`;
   let image: string | null = null;
   let isBook = false;
   let description = "";
+
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
   try {
-    const res = await fetch(amazonUrl, {
-      headers: {
-        "User-Agent": BROWSER_UA,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Upgrade-Insecure-Requests": "1",
-      },
-    });
-    if (res.ok) {
-      const parsed = await parseAmazonHtml(res);
-      if (parsed.title) title = parsed.title;
-      if (parsed.image) image = parsed.image;
-      if (parsed.authors && parsed.authors.length > 0) {
-        isBook = true;
-        description = `${parsed.authors.join(", ")} (著)`;
-      } else if (parsed.description) {
-        description = parsed.description;
-      }
+    browser = await puppeteer.launch(env.BROWSER);
+    const page = await browser.newPage();
+    await page.goto(amazonUrl, { waitUntil: "domcontentloaded" });
+    const html = await page.content();
+    const parsed = await parseAmazonHtml(new Response(html));
+    if (parsed.title) title = parsed.title;
+    if (parsed.image) image = parsed.image;
+    if (parsed.authors && parsed.authors.length > 0) {
+      isBook = true;
+      description = `${parsed.authors.join(", ")} (著)`;
+    } else if (parsed.description) {
+      description = parsed.description;
     }
   } catch {
     // fall through with defaults
+  } finally {
+    if (browser) await browser.close();
   }
   return { asin, amazonUrl, title, image, isBook, description };
 }
 
-async function ogpPage(asin: string): Promise<Response> {
+async function ogpPage(asin: string, env: Env): Promise<Response> {
   const cache = caches.default;
   const cacheKey = new Request(`https://amzcard.invalid/dp/${asin}`);
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  const product = await fetchAmazonProduct(asin);
+  const product = await fetchAmazonProduct(asin, env);
   const body = renderOgp(product);
   const response = new Response(body, {
     headers: {
@@ -146,13 +91,13 @@ async function ogpPage(asin: string): Promise<Response> {
   return response;
 }
 
-async function previewApi(asin: string): Promise<Response> {
+async function previewApi(asin: string, env: Env): Promise<Response> {
   const cache = caches.default;
   const cacheKey = new Request(`https://amzcard.invalid/api/preview/${asin}`);
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  const product = await fetchAmazonProduct(asin);
+  const product = await fetchAmazonProduct(asin, env);
   const response = new Response(JSON.stringify(product), {
     headers: {
       "content-type": "application/json; charset=utf-8",
