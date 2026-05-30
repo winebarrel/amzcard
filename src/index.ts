@@ -16,7 +16,12 @@ export default {
 
     const dp = url.pathname.match(/^\/dp\/([A-Z0-9]{10})\/?$/i);
     if (dp) {
-      return ogpPage(dp[1].toUpperCase(), env, refresh);
+      const asin = dp[1].toUpperCase();
+      const ua = req.headers.get("user-agent") ?? "";
+      if (!isCrawler(ua)) {
+        return Response.redirect(`https://${AMAZON_HOST}/dp/${asin}`, 302);
+      }
+      return ogpPage(asin, env, refresh);
     }
 
     const api = url.pathname.match(/^\/api\/preview\/([A-Z0-9]{10})\/?$/i);
@@ -46,6 +51,12 @@ function extractAsin(input: string): string | null {
   if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
   const m = trimmed.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([A-Z0-9]{10})/i);
   return m ? m[1].toUpperCase() : null;
+}
+
+function isCrawler(ua: string): boolean {
+  return /bot|crawler|spider|facebookexternalhit|slackbot|linkedinbot|whatsapp|telegrambot|pinterest|embedly|developers\.google\.com\/\+\/web\/snippet/i.test(
+    ua,
+  );
 }
 
 type Product = {
