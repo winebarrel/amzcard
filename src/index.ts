@@ -55,7 +55,6 @@ async function fetchAmazonProduct(asin: string): Promise<Product> {
         "Sec-Fetch-Site": "none",
         "Upgrade-Insecure-Requests": "1",
       },
-      cf: { cacheTtl: 3600, cacheEverything: true },
     });
     if (res.ok) {
       const parsed = await parseAmazonHtml(res);
@@ -88,7 +87,9 @@ async function ogpPage(asin: string): Promise<Response> {
       "cache-control": "public, max-age=3600",
     },
   });
-  await cache.put(cacheKey, response.clone());
+  if (product.image) {
+    await cache.put(cacheKey, response.clone());
+  }
   return response;
 }
 
@@ -105,7 +106,9 @@ async function previewApi(asin: string): Promise<Response> {
       "cache-control": "public, max-age=3600",
     },
   });
-  await cache.put(cacheKey, response.clone());
+  if (product.image) {
+    await cache.put(cacheKey, response.clone());
+  }
   return response;
 }
 
