@@ -25,6 +25,13 @@ export default {
     }
 
     if (url.pathname === "/" || url.pathname === "") {
+      const input = url.searchParams.get("url");
+      if (input) {
+        const asin = extractAsin(input);
+        if (asin) {
+          return Response.redirect(`${url.origin}/dp/${asin}`, 302);
+        }
+      }
       return new Response(indexHtml, {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
@@ -33,6 +40,13 @@ export default {
     return new Response("Not Found", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
+
+function extractAsin(input: string): string | null {
+  const trimmed = input.trim();
+  if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
+  const m = trimmed.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([A-Z0-9]{10})/i);
+  return m ? m[1].toUpperCase() : null;
+}
 
 type Product = {
   asin: string;
