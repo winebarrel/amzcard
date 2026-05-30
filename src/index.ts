@@ -1,7 +1,8 @@
 import indexHtml from "./index.html";
 import { renderOgp } from "./render-ogp";
 
-const TWITTERBOT_UA = "Twitterbot/1.0";
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const AMAZON_HOST = "www.amazon.co.jp";
 
 export default {
@@ -46,8 +47,13 @@ async function fetchAmazonProduct(asin: string): Promise<Product> {
   try {
     const res = await fetch(amazonUrl, {
       headers: {
-        "User-Agent": TWITTERBOT_UA,
-        "Accept-Language": "ja,en;q=0.9",
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Upgrade-Insecure-Requests": "1",
       },
       cf: { cacheTtl: 3600, cacheEverything: true },
     });
