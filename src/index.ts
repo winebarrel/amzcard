@@ -19,6 +19,11 @@ export default {
       return previewApi(api[1].toUpperCase());
     }
 
+    const debug = url.pathname.match(/^\/debug\/([A-Z0-9]{10})\/?$/i);
+    if (debug) {
+      return debugProbe(debug[1].toUpperCase());
+    }
+
     if (url.pathname === "/" || url.pathname === "") {
       return new Response(indexHtml, {
         headers: { "content-type": "text/html; charset=utf-8" },
@@ -37,6 +42,54 @@ type Product = {
   isBook: boolean;
   description: string;
 };
+
+async function debugProbe(asin: string): Promise<Response> {
+  const amazonUrl = `https://${AMAZON_HOST}/dp/${asin}`;
+  const headers = {
+    "User-Agent": BROWSER_UA,
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Upgrade-Insecure-Requests": "1",
+  };
+  const probe = async (redirect: "manual" | "follow") => {
+    const started = Date.now();
+    try {
+      const res = await fetch(amazonUrl, { headers, redirect });
+      const text = await res.text();
+      const respHeaders: Record<string, string> = {};
+      res.headers.forEach((v, k) => {
+        respHeaders[k] = v;
+      });
+      return {
+        mode: redirect,
+        ok: res.ok,
+        status: res.status,
+        finalUrl: res.url,
+        redirected: res.redirected,
+        contentLength: text.length,
+        headers: respHeaders,
+        bodySnippet: text.slice(0, 400),
+        elapsedMs: Date.now() - started,
+      };
+    } catch (e) {
+      return {
+        mode: redirect,
+        error: String(e),
+        elapsedMs: Date.now() - started,
+      };
+    }
+  };
+  const [manual, follow] = await Promise.all([probe("manual"), probe("follow")]);
+  return new Response(JSON.stringify({ asin, amazonUrl, manual, follow }, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
 
 async function fetchAmazonProduct(asin: string): Promise<Product> {
   const amazonUrl = `https://${AMAZON_HOST}/dp/${asin}`;
