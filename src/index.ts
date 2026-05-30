@@ -114,7 +114,7 @@ async function ogpPage(asin: string, env: Env, refresh: boolean): Promise<Respon
   const response = new Response(body, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "public, max-age=3600",
+      "cache-control": product.image ? "public, max-age=3600" : "no-store",
     },
   });
   if (product.image) {
@@ -135,7 +135,7 @@ async function previewApi(asin: string, env: Env, refresh: boolean): Promise<Res
   const response = new Response(JSON.stringify(product), {
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=3600",
+      "cache-control": product.image ? "public, max-age=3600" : "no-store",
     },
   });
   if (product.image) {
