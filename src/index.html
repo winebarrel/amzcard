@@ -40,6 +40,11 @@
   .skeleton .bar.w70 { width: 70%; }
   .skeleton .bar.w90 { width: 90%; }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+  .bookmarklet-section { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  .bookmarklet-section h2 { font-size: 1.1rem; margin: 0 0 0.4rem; }
+  .bookmarklet-link { display: inline-block; margin-top: 0.6rem; padding: 0.5rem 0.9rem; background: rgba(127,127,127,0.1); border: 1px dashed #888; border-radius: 6px; text-decoration: none; color: inherit; font-weight: 600; cursor: grab; user-select: none; }
+  .bookmarklet-link:active { cursor: grabbing; }
 </style>
 </head>
 <body>
@@ -73,6 +78,12 @@
       <div id="card-desc" class="desc"></div>
     </div>
   </a>
+</div>
+
+<div class="bookmarklet-section">
+  <h2>ブックマークレット</h2>
+  <p class="lead">下のリンクをブックマークバーにドラッグ&amp;ドロップ。Amazon の商品ページで実行すると amzcard URL がクリップボードにコピーされます。</p>
+  <a id="bookmarklet" class="bookmarklet-link" href="javascript:void(0)">amzcard をコピー</a>
 </div>
 
 <script>
@@ -190,6 +201,10 @@ copy.addEventListener('click', async () => {
     // ignore
   }
 });
+
+const bookmarklet = document.getElementById('bookmarklet');
+const bmCode = `(function(o){var m=location.pathname.match(/\\/(?:dp|gp\\/product|gp\\/aw\\/d)\\/([A-Z0-9]{10})/i);if(!m){alert('ASIN を検出できませんでした');return}var u=o+'/dp/'+m[1].toUpperCase();navigator.clipboard.writeText(u).then(function(){alert('コピーしました:\\n'+u)},function(){prompt('コピーしてください:',u)})})('${location.origin}')`;
+bookmarklet.href = `javascript:${bmCode}`;
 </script>
 </body>
 </html>
