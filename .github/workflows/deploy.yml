@@ -27,3 +27,7 @@ jobs:
       - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          vars: |
+            CACHE_VERSION
+        env:
+          CACHE_VERSION: ${{ github.sha }}
