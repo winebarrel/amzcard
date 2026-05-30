@@ -3,6 +3,7 @@ export type OgpInput = {
   title: string;
   image: string | null;
   isBook: boolean;
+  preferLargeImage: boolean;
   description: string;
 };
 
@@ -11,7 +12,8 @@ export function renderOgp(p: OgpInput): string {
   const d = htmlEscape(p.description);
   const url = htmlEscape(p.amazonUrl);
   const img = p.image ? htmlEscape(p.image) : "";
-  const card = !img || p.isBook ? "summary" : "summary_large_image";
+  const useSummary = !img || (p.isBook && !p.preferLargeImage);
+  const card = useSummary ? "summary" : "summary_large_image";
 
   return `<!DOCTYPE html>
 <html lang="ja">

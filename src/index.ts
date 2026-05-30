@@ -21,7 +21,7 @@ export default {
       if (!isCrawler(ua)) {
         return Response.redirect(`https://${AMAZON_HOST}/dp/${asin}`, 302);
       }
-      return ogpPage(asin, env, refresh);
+      return ogpPage(asin, env, refresh, preferLargeImage(ua));
     }
 
     const api = url.pathname.match(/^\/api\/preview\/([A-Z0-9]{10})\/?$/i);
@@ -57,6 +57,13 @@ function isCrawler(ua: string): boolean {
   return /bot|crawler|spider|facebookexternalhit|slackbot|linkedinbot|whatsapp|telegrambot|pinterest|embedly|developers\.google\.com\/\+\/web\/snippet/i.test(
     ua,
   );
+}
+
+// Slack and Teams don't render an image when twitter:card is "summary",
+// only when it's "summary_large_image". For these clients we override
+// the book layout to always use the large card so the cover shows up.
+function preferLargeImage(ua: string): boolean {
+  return /Slackbot|TeamsChannelConnector|Microsoft.*Teams/i.test(ua);
 }
 
 type Product = {
@@ -126,20 +133,29 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
   return { asin, amazonUrl, title, image, isBook, description };
 }
 
-async function ogpPage(asin: string, env: Env, refresh: boolean): Promise<Response> {
+async function ogpPage(
+  asin: string,
+  env: Env,
+  refresh: boolean,
+  large: boolean,
+): Promise<Response> {
   const cache = caches.default;
-  const cacheKey = new Request(`https://amzcard.invalid/${env.CACHE_VERSION}/dp/${asin}`);
+  const variant = large ? "large" : "default";
+  const cacheKey = new Request(
+    `https://amzcard.invalid/${env.CACHE_VERSION}/dp/${asin}/${variant}`,
+  );
   if (!refresh) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
   }
 
   const product = await fetchAmazonProduct(asin, env);
-  const body = renderOgp(product);
+  const body = renderOgp({ ...product, preferLargeImage: large });
   const response = new Response(body, {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": product.image ? "public, max-age=3600" : "no-store",
+      vary: "User-Agent",
     },
   });
   if (product.image) {
