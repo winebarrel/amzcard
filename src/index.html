@@ -43,8 +43,7 @@
 
   .bookmarklet-section { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
   .bookmarklet-section h2 { font-size: 1.1rem; margin: 0 0 0.4rem; }
-  .bookmarklet-link { display: inline-block; margin-top: 0.6rem; padding: 0.5rem 0.9rem; background: rgba(127,127,127,0.1); border: 1px dashed #888; border-radius: 6px; text-decoration: none; color: inherit; font-weight: 600; cursor: grab; user-select: none; }
-  .bookmarklet-link:active { cursor: grabbing; }
+  .bookmarklet-code { width: 100%; min-height: 4.5rem; margin-top: 0.6rem; padding: 0.6rem 0.7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; line-height: 1.4; border: 1px solid #bbb; border-radius: 6px; resize: vertical; box-sizing: border-box; white-space: pre-wrap; word-break: break-all; color: inherit; background: rgba(127,127,127,0.05); }
 </style>
 </head>
 <body>
@@ -82,8 +81,9 @@
 
 <div class="bookmarklet-section">
   <h2>ブックマークレット</h2>
-  <p class="lead">下のリンクをブックマークバーにドラッグ&amp;ドロップ。Amazon の商品ページで実行すると amzcard URL がクリップボードにコピーされます。</p>
-  <a id="bookmarklet" class="bookmarklet-link" href="javascript:void(0)">amzcard をコピー</a>
+  <p class="lead">下のコードをコピーし、新規ブックマークの URL に貼り付けて保存してください。Amazon の商品ページで実行すると amzcard URL がクリップボードにコピーされます。</p>
+  <textarea id="bookmarklet-code" class="bookmarklet-code" readonly></textarea>
+  <button id="bookmarklet-copy" type="button">コピー</button>
 </div>
 
 <script>
@@ -202,9 +202,20 @@ copy.addEventListener('click', async () => {
   }
 });
 
-const bookmarklet = document.getElementById('bookmarklet');
-const bmCode = `(function(o){var m=location.pathname.match(/\\/(?:dp|gp\\/product|gp\\/aw\\/d)\\/([A-Z0-9]{10})/i);if(!m){alert('ASIN を検出できませんでした');return}var u=o+'/dp/'+m[1].toUpperCase();navigator.clipboard.writeText(u).then(function(){alert('コピーしました:\\n'+u)},function(){prompt('コピーしてください:',u)})})('${location.origin}')`;
-bookmarklet.href = `javascript:${bmCode}`;
+const bmCode = `javascript:(function(o){var m=location.pathname.match(/\\/(?:dp|gp\\/product|gp\\/aw\\/d)\\/([A-Z0-9]{10})/i);if(!m){alert('ASIN を検出できませんでした');return}var u=o+'/dp/'+m[1].toUpperCase();navigator.clipboard.writeText(u).then(function(){alert('コピーしました:\\n'+u)},function(){prompt('コピーしてください:',u)})})('${location.origin}')`;
+const bookmarkletCode = document.getElementById('bookmarklet-code');
+const bookmarkletCopy = document.getElementById('bookmarklet-copy');
+bookmarkletCode.value = bmCode;
+bookmarkletCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(bmCode);
+    const orig = bookmarkletCopy.textContent;
+    bookmarkletCopy.textContent = 'コピーしました';
+    setTimeout(() => { bookmarkletCopy.textContent = orig; }, 1500);
+  } catch {
+    bookmarkletCode.select();
+  }
+});
 </script>
 </body>
 </html>
