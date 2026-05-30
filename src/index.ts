@@ -6,6 +6,7 @@ const AMAZON_HOST = "www.amazon.co.jp";
 
 interface Env {
   BROWSER: BrowserWorker;
+  CACHE_VERSION: string;
 }
 
 export default {
@@ -102,7 +103,7 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
 
 async function ogpPage(asin: string, env: Env, refresh: boolean): Promise<Response> {
   const cache = caches.default;
-  const cacheKey = new Request(`https://amzcard.invalid/dp/${asin}`);
+  const cacheKey = new Request(`https://amzcard.invalid/${env.CACHE_VERSION}/dp/${asin}`);
   if (!refresh) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
@@ -124,7 +125,7 @@ async function ogpPage(asin: string, env: Env, refresh: boolean): Promise<Respon
 
 async function previewApi(asin: string, env: Env, refresh: boolean): Promise<Response> {
   const cache = caches.default;
-  const cacheKey = new Request(`https://amzcard.invalid/api/preview/${asin}`);
+  const cacheKey = new Request(`https://amzcard.invalid/${env.CACHE_VERSION}/api/preview/${asin}`);
   if (!refresh) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
