@@ -202,7 +202,7 @@ copy.addEventListener('click', async () => {
   }
 });
 
-const bmCode = `javascript:(function(o){var m=location.pathname.match(/\\/(?:dp|gp\\/product|gp\\/aw\\/d)\\/([A-Z0-9]{10})/i);if(!m){return}var u=o+'/dp/'+m[1].toUpperCase();function t(s){var e=document.createElement('div');e.textContent=s;e.style.cssText='position:fixed;top:16px;right:16px;padding:10px 14px;background:#222;color:#fff;border-radius:6px;z-index:2147483647;font:14px -apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3)';document.body.appendChild(e);setTimeout(function(){e.remove()},1500)}navigator.clipboard.writeText(u).then(function(){t('amzcard URL をコピーしました')},function(){prompt('コピーしてください:',u)})})('${location.origin}')`;
+const bmCode = `javascript:(function(o){var m=location.pathname.match(/\\/(?:dp|gp\\/product|gp\\/aw\\/d)\\/([A-Z0-9]{10})/i);if(!m){return}var u=o+'/dp/'+m[1].toUpperCase();function t(s){var e=document.createElement('div');e.textContent=s;e.style.cssText='position:fixed;top:16px;right:16px;padding:10px 14px;background:#222;color:#fff;border-radius:6px;z-index:2147483647;font:14px -apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3)';document.body.appendChild(e);setTimeout(function(){e.remove()},1500)}var ta=document.createElement('textarea');ta.value=u;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();if(ok){t('amzcard URL をコピーしました')}else{prompt('コピーしてください:',u)}})('${location.origin}')`;
 const bookmarkletCode = document.getElementById('bookmarklet-code');
 const bookmarkletCopy = document.getElementById('bookmarklet-copy');
 bookmarkletCode.value = bmCode;
