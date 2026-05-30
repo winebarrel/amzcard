@@ -53,6 +53,7 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
   try {
     browser = await puppeteer.launch(env.BROWSER);
     const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({ "Accept-Language": "ja,en;q=0.9" });
     await page.goto(amazonUrl, { waitUntil: "domcontentloaded" });
 
     const extracted = (await page.evaluate(`(() => {
