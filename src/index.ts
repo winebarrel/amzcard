@@ -11,15 +11,16 @@ interface Env {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+    const refresh = url.searchParams.get("refresh") === "1";
 
     const dp = url.pathname.match(/^\/dp\/([A-Z0-9]{10})\/?$/i);
     if (dp) {
-      return ogpPage(dp[1].toUpperCase(), env);
+      return ogpPage(dp[1].toUpperCase(), env, refresh);
     }
 
     const api = url.pathname.match(/^\/api\/preview\/([A-Z0-9]{10})\/?$/i);
     if (api) {
-      return previewApi(api[1].toUpperCase(), env);
+      return previewApi(api[1].toUpperCase(), env, refresh);
     }
 
     if (url.pathname === "/" || url.pathname === "") {
@@ -53,15 +54,42 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
     browser = await puppeteer.launch(env.BROWSER);
     const page = await browser.newPage();
     await page.goto(amazonUrl, { waitUntil: "domcontentloaded" });
-    const html = await page.content();
-    const parsed = await parseAmazonHtml(new Response(html));
-    if (parsed.title) title = parsed.title;
-    if (parsed.image) image = parsed.image;
-    if (parsed.authors && parsed.authors.length > 0) {
+
+    const extracted = (await page.evaluate(`(() => {
+      const text = (el) => (el?.textContent ?? "").trim();
+      const productTitle = text(document.getElementById("productTitle"));
+      const docTitle = (document.title || "").trim().replace(/\\s*\\|\\s*Amazon\\s*$/i, "");
+      const landing = document.getElementById("landingImage");
+      const oldHires = landing?.getAttribute("data-old-hires") ?? "";
+      const imgSrc = landing?.getAttribute("src") ?? "";
+      const metaDesc =
+        document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "";
+      const authors = Array.from(document.querySelectorAll("#bylineInfo .author a"))
+        .map((a) => text(a))
+        .filter(Boolean);
+      return {
+        title: productTitle || docTitle || "",
+        imageSrc: imgSrc,
+        imageOldHires: oldHires,
+        description: metaDesc.slice(0, 200),
+        authors,
+      };
+    })()`)) as {
+      title: string;
+      imageSrc: string;
+      imageOldHires: string;
+      description: string;
+      authors: string[];
+    };
+
+    if (extracted.title) title = extracted.title;
+    const rawImage = extracted.imageSrc || extracted.imageOldHires;
+    if (rawImage) image = stripAmazonImageSize(rawImage);
+    if (extracted.authors.length > 0) {
       isBook = true;
-      description = `${parsed.authors.join(", ")} (著)`;
-    } else if (parsed.description) {
-      description = parsed.description;
+      description = `${extracted.authors.join(", ")} (著)`;
+    } else if (extracted.description) {
+      description = extracted.description;
     }
   } catch {
     // fall through with defaults
@@ -71,11 +99,13 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
   return { asin, amazonUrl, title, image, isBook, description };
 }
 
-async function ogpPage(asin: string, env: Env): Promise<Response> {
+async function ogpPage(asin: string, env: Env, refresh: boolean): Promise<Response> {
   const cache = caches.default;
   const cacheKey = new Request(`https://amzcard.invalid/dp/${asin}`);
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+  if (!refresh) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+  }
 
   const product = await fetchAmazonProduct(asin, env);
   const body = renderOgp(product);
@@ -91,11 +121,13 @@ async function ogpPage(asin: string, env: Env): Promise<Response> {
   return response;
 }
 
-async function previewApi(asin: string, env: Env): Promise<Response> {
+async function previewApi(asin: string, env: Env, refresh: boolean): Promise<Response> {
   const cache = caches.default;
   const cacheKey = new Request(`https://amzcard.invalid/api/preview/${asin}`);
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+  if (!refresh) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+  }
 
   const product = await fetchAmazonProduct(asin, env);
   const response = new Response(JSON.stringify(product), {
@@ -110,86 +142,6 @@ async function previewApi(asin: string, env: Env): Promise<Response> {
   return response;
 }
 
-type Parsed = {
-  title?: string;
-  image?: string;
-  description?: string;
-  authors?: string[];
-};
-
-async function parseAmazonHtml(res: Response): Promise<Parsed> {
-  const titleTag = new TextCollector();
-  const productTitle = new TextCollector();
-  const authors = new AuthorCollector();
-  const meta: { description?: string } = {};
-  let landingImage: string | undefined;
-
-  const rewriter = new HTMLRewriter()
-    .on("title", titleTag)
-    .on("#productTitle", productTitle)
-    .on("#bylineInfo .author a", authors)
-    .on('meta[name="description"]', {
-      element(el) {
-        const c = el.getAttribute("content");
-        if (c) meta.description = c;
-      },
-    })
-    .on("#landingImage", {
-      element(el) {
-        landingImage = el.getAttribute("src") ?? undefined;
-      },
-    });
-
-  await rewriter.transform(res).text();
-
-  const out: Parsed = {};
-
-  const pt = productTitle.out.trim();
-  if (pt) {
-    out.title = pt;
-  } else {
-    const tt = titleTag.out.trim().replace(/\s*\|\s*Amazon\s*$/i, "");
-    if (tt) out.title = tt;
-  }
-
-  if (landingImage) {
-    out.image = stripAmazonImageSize(landingImage);
-  }
-
-  if (meta.description) {
-    out.description = meta.description.slice(0, 200);
-  }
-
-  if (authors.list.length > 0) {
-    out.authors = authors.list;
-  }
-
-  return out;
-}
-
 function stripAmazonImageSize(url: string): string {
   return url.replace(/\._[A-Z0-9_+]+_\.(jpg|jpeg|png|gif|webp)$/i, ".$1");
-}
-
-class TextCollector {
-  out = "";
-  text(chunk: Text) {
-    this.out += chunk.text;
-  }
-}
-
-class AuthorCollector {
-  private buf = "";
-  list: string[] = [];
-  element(el: Element) {
-    this.buf = "";
-    el.onEndTag(() => {
-      const name = this.buf.trim();
-      if (name) this.list.push(name);
-      this.buf = "";
-    });
-  }
-  text(chunk: Text) {
-    this.buf += chunk.text;
-  }
 }
