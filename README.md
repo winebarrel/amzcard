@@ -1,5 +1,6 @@
 # amzcard
 
+[![Deploy](https://github.com/winebarrel/amzcard/actions/workflows/deploy.yml/badge.svg)](https://github.com/winebarrel/amzcard/actions/workflows/deploy.yml)
 [![CI](https://github.com/winebarrel/amzcard/actions/workflows/ci.yml/badge.svg)](https://github.com/winebarrel/amzcard/actions/workflows/ci.yml)
 
 Amazon の商品ページ URL を X (Twitter) の OGP カードに対応した URL に変換する Cloudflare Workers アプリ。
