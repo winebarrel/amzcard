@@ -40,10 +40,6 @@
   .skeleton .bar.w70 { width: 70%; }
   .skeleton .bar.w90 { width: 90%; }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
-
-  .bookmarklet-section { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
-  .bookmarklet-section h2 { font-size: 1.1rem; margin: 0 0 0.4rem; }
-  .bookmarklet-code { width: 100%; min-height: 4.5rem; margin-top: 0.6rem; padding: 0.6rem 0.7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; line-height: 1.4; border: 1px solid #bbb; border-radius: 6px; resize: vertical; box-sizing: border-box; white-space: pre-wrap; word-break: break-all; color: inherit; background: rgba(127,127,127,0.05); }
 </style>
 </head>
 <body>
@@ -77,13 +73,6 @@
       <div id="card-desc" class="desc"></div>
     </div>
   </a>
-</div>
-
-<div class="bookmarklet-section">
-  <h2>ブックマークレット</h2>
-  <p class="lead">下のコードをコピーし、新規ブックマークの URL に貼り付けて保存してください。Amazon の商品ページで実行すると amzcard URL がクリップボードにコピーされます。</p>
-  <textarea id="bookmarklet-code" class="bookmarklet-code" readonly></textarea>
-  <button id="bookmarklet-copy" type="button">コピー</button>
 </div>
 
 <script>
@@ -199,21 +188,6 @@ copy.addEventListener('click', async () => {
     setTimeout(() => copy.textContent = orig, 1500);
   } catch {
     // ignore
-  }
-});
-
-const bmCode = `javascript:(function(o){var m=location.pathname.match(/\\/(?:dp|gp\\/product|gp\\/aw\\/d)\\/([A-Z0-9]{10})/i);if(!m){return}var u=o+'/dp/'+m[1].toUpperCase();var ta=document.createElement('textarea');ta.value=u;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();if(ok){alert('amzcard URL をコピーしました:\\n'+u)}else{prompt('コピーしてください:',u)}})('${location.origin}')`;
-const bookmarkletCode = document.getElementById('bookmarklet-code');
-const bookmarkletCopy = document.getElementById('bookmarklet-copy');
-bookmarkletCode.value = bmCode;
-bookmarkletCopy.addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(bmCode);
-    const orig = bookmarkletCopy.textContent;
-    bookmarkletCopy.textContent = 'コピーしました';
-    setTimeout(() => { bookmarkletCopy.textContent = orig; }, 1500);
-  } catch {
-    bookmarkletCode.select();
   }
 });
 </script>
