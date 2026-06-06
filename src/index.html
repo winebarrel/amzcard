@@ -40,6 +40,13 @@
   .skeleton .bar.w70 { width: 70%; }
   .skeleton .bar.w90 { width: 90%; }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+  .preparing { margin-top: 1.2rem; padding: 0.9rem 1rem; background: rgba(127,127,127,0.1); border-radius: 6px; color: var(--muted); font-size: 0.9rem; display: none; }
+  .preparing.show { display: block; }
+  .preparing .label { margin-bottom: 0.5rem; }
+  .progress { height: 0.4rem; background: rgba(127,127,127,0.15); border-radius: 999px; overflow: hidden; position: relative; }
+  .progress::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 40%; background: rgba(127,127,127,0.55); border-radius: 999px; animation: progress-slide 1.2s ease-in-out infinite; }
+  @keyframes progress-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(360%); } }
 </style>
 </head>
 <body>
@@ -47,6 +54,11 @@
 <p class="lead">Amazon の商品 URL を OGP カード対応の URL に変換します。</p>
 <input id="input" type="text" placeholder="https://www.amazon.co.jp/dp/ASIN... または ASIN を直接">
 <div class="hint">短縮 URL (amzn.asia / amzn.to) は未対応。Amazon の商品ページ URL を貼ってください。</div>
+
+<div id="preparing" class="preparing">
+  <div class="label">URL を準備中...</div>
+  <div class="progress"></div>
+</div>
 
 <div id="result" class="result">
   <div class="url"><a id="link" href="" target="_blank" rel="noopener" aria-label="変換後 URL"></a></div>
@@ -77,6 +89,7 @@
 
 <script>
 const input = document.getElementById('input');
+const preparing = document.getElementById('preparing');
 const result = document.getElementById('result');
 const link = document.getElementById('link');
 const copy = document.getElementById('copy');
@@ -133,6 +146,27 @@ function showCard(data) {
   card.classList.add('show');
 }
 
+function showLink(asin) {
+  const out = `${location.origin}/dp/${asin}`;
+  link.textContent = out;
+  link.href = out;
+  result.classList.add('show');
+  result.classList.remove('error');
+  preparing.classList.remove('show');
+}
+
+function showError(msg) {
+  link.textContent = msg;
+  link.removeAttribute('href');
+  result.classList.add('show', 'error');
+  preparing.classList.remove('show');
+}
+
+function hideResult() {
+  result.classList.remove('show', 'error');
+  preparing.classList.remove('show');
+}
+
 async function loadPreview(asin) {
   const token = ++fetchToken;
   showSkeleton();
@@ -143,9 +177,11 @@ async function loadPreview(asin) {
     const data = await res.json();
     if (token !== fetchToken) return;
     showCard(data);
+    showLink(asin);
   } catch {
     if (token !== fetchToken) return;
     hidePreview();
+    showError('プレビュー取得に失敗しました');
   }
 }
 
@@ -155,23 +191,18 @@ function update() {
     currentAsin = null;
     hidePreview();
     if (input.value.trim()) {
-      result.classList.add('show', 'error');
-      link.textContent = 'ASIN を検出できませんでした';
-      link.removeAttribute('href');
+      showError('ASIN を検出できませんでした');
     } else {
-      result.classList.remove('show', 'error');
+      hideResult();
     }
     if (debounceTimer) clearTimeout(debounceTimer);
     return;
   }
-  const out = `${location.origin}/dp/${asin}`;
-  link.textContent = out;
-  link.href = out;
-  result.classList.add('show');
-  result.classList.remove('error');
 
   if (asin !== currentAsin) {
     currentAsin = asin;
+    hideResult();
+    preparing.classList.add('show');
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => loadPreview(asin), 350);
   }

@@ -133,56 +133,54 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
   return { asin, amazonUrl, title, image, isBook, description };
 }
 
+async function getProduct(asin: string, env: Env, refresh: boolean): Promise<Product> {
+  const cache = caches.default;
+  const cacheKey = new Request(`https://amzcard.invalid/${env.CACHE_VERSION}/_product/${asin}`);
+  if (!refresh) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return (await cached.json()) as Product;
+  }
+
+  const product = await fetchAmazonProduct(asin, env);
+  if (product.image) {
+    await cache.put(
+      cacheKey,
+      new Response(JSON.stringify(product), {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=604800",
+        },
+      }),
+    );
+  }
+  return product;
+}
+
 async function ogpPage(
   asin: string,
   env: Env,
   refresh: boolean,
   large: boolean,
 ): Promise<Response> {
-  const cache = caches.default;
-  const variant = large ? "large" : "default";
-  const cacheKey = new Request(
-    `https://amzcard.invalid/${env.CACHE_VERSION}/dp/${asin}/${variant}`,
-  );
-  if (!refresh) {
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-  }
-
-  const product = await fetchAmazonProduct(asin, env);
+  const product = await getProduct(asin, env, refresh);
   const body = renderOgp({ ...product, preferLargeImage: large });
-  const response = new Response(body, {
+  return new Response(body, {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": product.image ? "public, max-age=604800" : "no-store",
       vary: "User-Agent",
     },
   });
-  if (product.image) {
-    await cache.put(cacheKey, response.clone());
-  }
-  return response;
 }
 
 async function previewApi(asin: string, env: Env, refresh: boolean): Promise<Response> {
-  const cache = caches.default;
-  const cacheKey = new Request(`https://amzcard.invalid/${env.CACHE_VERSION}/api/preview/${asin}`);
-  if (!refresh) {
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-  }
-
-  const product = await fetchAmazonProduct(asin, env);
-  const response = new Response(JSON.stringify(product), {
+  const product = await getProduct(asin, env, refresh);
+  return new Response(JSON.stringify(product), {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": product.image ? "public, max-age=604800" : "no-store",
     },
   });
-  if (product.image) {
-    await cache.put(cacheKey, response.clone());
-  }
-  return response;
 }
 
 function stripAmazonImageSize(url: string): string {
