@@ -7,6 +7,7 @@ const AMAZON_HOST = "www.amazon.co.jp";
 interface Env {
   BROWSER: BrowserWorker;
   CACHE_VERSION: string;
+  AMZCARD_CACHE: KVNamespace;
 }
 
 export default {
@@ -134,24 +135,17 @@ async function fetchAmazonProduct(asin: string, env: Env): Promise<Product> {
 }
 
 async function getProduct(asin: string, env: Env, refresh: boolean): Promise<Product> {
-  const cache = caches.default;
-  const cacheKey = new Request(`https://amzcard.invalid/${env.CACHE_VERSION}/_product/${asin}`);
+  const key = `${env.CACHE_VERSION}/product/${asin}`;
   if (!refresh) {
-    const cached = await cache.match(cacheKey);
-    if (cached) return (await cached.json()) as Product;
+    const cached = await env.AMZCARD_CACHE.get<Product>(key, { type: "json" });
+    if (cached) return cached;
   }
 
   const product = await fetchAmazonProduct(asin, env);
   if (product.image) {
-    await cache.put(
-      cacheKey,
-      new Response(JSON.stringify(product), {
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "public, max-age=604800",
-        },
-      }),
-    );
+    await env.AMZCARD_CACHE.put(key, JSON.stringify(product), {
+      expirationTtl: 604800,
+    });
   }
   return product;
 }

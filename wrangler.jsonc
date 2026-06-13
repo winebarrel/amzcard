@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "browser": { "binding": "BROWSER" },
   "vars": { "CACHE_VERSION": "local" },
+  "kv_namespaces": [{ "binding": "AMZCARD_CACHE", "id": "36fc06c03b674e06bebab0b47b007dbc" }],
   "observability": {
     "enabled": true
   }
