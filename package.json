@@ -14,7 +14,7 @@
     "@biomejs/biome": "2.5.2",
     "@cloudflare/puppeteer": "^1.1.0",
     "@cloudflare/workers-types": "^4.20250515.0",
-    "typescript": "^6.0.0",
+    "typescript": "^7.0.0",
     "wrangler": "^4.95.0"
   }
 }
