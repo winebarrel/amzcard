@@ -15,6 +15,6 @@
     "@cloudflare/puppeteer": "^1.1.0",
     "@cloudflare/workers-types": "^4.20250515.0",
     "typescript": "^7.0.0",
-    "wrangler": "^4.95.0"
+    "wrangler": "^4.114.0"
   }
 }
